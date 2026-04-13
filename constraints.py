@@ -17,18 +17,22 @@ gr = Const('gr', Graphemes)
 # -------------------------------------------------------------------------------------
 
 # Classifier functions
-is_vowel     = Function('is_vowel',     Graphemes, BoolSort())
-is_glide     = Function('is_glide',     Graphemes, BoolSort())
-is_liquid    = Function('is_liquid',    Graphemes, BoolSort())
-is_nasal     = Function('is_nasal',     Graphemes, BoolSort())
+is_vowel = Function('is_vowel',     Graphemes, BoolSort())
+is_glide = Function('is_glide',     Graphemes, BoolSort())
+is_liquid = Function('is_liquid',    Graphemes, BoolSort())
+is_nasal = Function('is_nasal',     Graphemes, BoolSort())
 is_fricative = Function('is_fricative', Graphemes, BoolSort())
 is_affricate = Function('is_affricate', Graphemes, BoolSort())
-is_stop      = Function('is_stop',      Graphemes, BoolSort())
-
-# Grouping functions
+is_stop = Function('is_stop',      Graphemes, BoolSort())
+is_voiced = Function('is_voiced', Graphemes, BoolSort())
 is_obstruent = Function('is_obstruent', Graphemes, BoolSort())
-is_sonorant  = Function('is_sonorant',  Graphemes, BoolSort())
+is_voiced_obstruent = Function('is_voiced_obstruent', Graphemes, BoolSort())
+is_sonorant = Function('is_sonorant',  Graphemes, BoolSort())
 is_consonant = Function('is_consonant', Graphemes, BoolSort())
+is_coda_second_banned = Function('is_coda_second_banned', Graphemes, BoolSort())
+is_alveolar = Function('is_alveolar', Graphemes, BoolSort())
+is_bilabial = Function('is_bilabial', Graphemes, BoolSort())
+is_velar = Function('is_velar', Graphemes, BoolSort())
 
 all_graphemes = [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,th,ch,sh,ng]
 
@@ -38,13 +42,19 @@ def is_in_set(fn, members):
     return [fn(l) == BoolVal(l in member_set) for l in all_graphemes]
 
 # Phonological classes
-VOWELS     = [a, e, i, o, u]
-GLIDES     = [w, y]
-LIQUIDS    = [l, r]
-NASALS     = [m, n, ng]
+VOWELS = [a, e, i, o, u]
+GLIDES = [w, y]
+LIQUIDS = [l, r]
+NASALS = [m, n, ng]
 FRICATIVES = [f, v, s, z, h, th, sh]
 AFFRICATES = [ch, j]
-STOPS      = [b, d, g, k, p, t]
+STOPS = [b, d, g, k, p, t]
+VOICED = [a, e, i, o, u, b, d, g, v, z, j, l, r, m, n, ng, w, y, th]
+VOICED_OBSTRUENTS = [b, d, g, v, z, j]
+CODA_SECOND_BANNED = [ng, th, r, sh]
+ALVEOLARS = [t, d, s, z, n, l, r]
+BILABIALS = [p, b, m]
+VELARS = [k, g, ng]
 
 solver = Solver()
 solver.add(is_in_set(is_vowel,     VOWELS))
@@ -54,6 +64,12 @@ solver.add(is_in_set(is_nasal,     NASALS))
 solver.add(is_in_set(is_fricative, FRICATIVES))
 solver.add(is_in_set(is_affricate, AFFRICATES))
 solver.add(is_in_set(is_stop,      STOPS))
+solver.add(is_in_set(is_voiced_obstruent, VOICED_OBSTRUENTS))
+solver.add(is_in_set(is_coda_second_banned, CODA_SECOND_BANNED))
+solver.add(is_in_set(is_voiced, VOICED))
+solver.add(is_in_set(is_alveolar, ALVEOLARS))
+solver.add(is_in_set(is_bilabial, BILABIALS))
+solver.add(is_in_set(is_velar,    VELARS))
 
 # Obstruent = stop | fricative | affricate
 solver.add(ForAll([gr], is_obstruent(gr) == Or(is_stop(gr), is_fricative(gr), is_affricate(gr))))
@@ -183,7 +199,7 @@ solver.add(ForAll([s_idx], Implies(
 
 # Phonotactic Rule #1: All phonological words must contain at least
 # one syllable, and hence must contain at least one vowel.
-# --- Guaranteed structurally by num_syllables >= 1 and nucleus must be a vowel. --
+# --- Guaranteed by num_syllables >= 1 and nucleus must be a vowel. ---
 
 # Phonotactic Rule #2: Sequences of repeated consonants are not possible.
 solver.add(ForAll([ind], Implies(
@@ -209,35 +225,105 @@ solver.add(ForAll([s_idx, c_idx], Implies(
 
 # Phonotactic Rule #5: The affricates /tS/ and /dZ/, and the glottal
 # fricative /h/, do not occur in complex onsets.
+solver.add(ForAll([s_idx, c_idx], Implies(
+    And(s_idx >= 0, s_idx < num_syllables,
+        onset_length[s_idx] > 1,
+        c_idx >= 0, c_idx < onset_length[s_idx]),
+    And(
+        onset_letters[s_idx * MAX_ONSET + c_idx] != ch,
+        onset_letters[s_idx * MAX_ONSET + c_idx] != j,
+        onset_letters[s_idx * MAX_ONSET + c_idx] != h
+    )
+)))
 
 # Phonotactic Rule #6: The first consonant in a two-consonant onset
 # must be an obstruent.
+solver.add(ForAll([s_idx], Implies(
+    And(s_idx >= 0, s_idx < num_syllables,
+        onset_length[s_idx] >= 2),
+    is_obstruent(onset_letters[s_idx * MAX_ONSET + 0])
+)))
 
 # Phonotactic Rule #7: The second consonant in a two-consonant onset
 # must not be a voiced obstruent.
+solver.add(ForAll([s_idx], Implies(
+    And(s_idx >= 0, s_idx < num_syllables,
+        onset_length[s_idx] >= 2),
+    Not(is_voiced_obstruent(onset_letters[s_idx * MAX_ONSET + 1]))
+)))
 
 # Phonotactic Rule #8: If the first consonant of a two-consonant onset
 # is not an /s/, the second consonant must be a liquid or a glide—the
 # second consonant must be /l/, /®/, /w/, or /j/.
+solver.add(ForAll([s_idx], Implies(
+    And(s_idx >= 0, s_idx < num_syllables,
+        onset_length[s_idx] >= 2,
+        onset_letters[s_idx * MAX_ONSET + 0] != s),
+    Or(is_liquid(onset_letters[s_idx * MAX_ONSET + 1]),
+       is_glide(onset_letters[s_idx * MAX_ONSET + 1]))
+)))
 
 # Phonotactic Rule #9: The Substring Rule: Every subsequence
 # contained within a sequence of consonants must obey all the
 # relevant phonotactic rules.
+# --- Guaranteed because constraints apply to every consonant at every position. ---
 
 # Phonotactic Rule #10: No glides in syllable codas.
+solver.add(ForAll([s_idx, c_idx], Implies(
+    And(s_idx >= 0, s_idx < num_syllables,
+        c_idx  >= 0, c_idx  < coda_length[s_idx]),
+    Not(is_glide(coda_letters[s_idx * MAX_CODA + c_idx]))
+)))
 
 # Phonotactic Rule #11: The second consonant in a two-consonant
 # coda cannot be /N/, /D/, /®/, or /Z/.
+solver.add(ForAll([s_idx], Implies(
+    And(s_idx >= 0, s_idx < num_syllables,
+        coda_length[s_idx] >= 2),
+    Not(is_coda_second_banned(coda_letters[s_idx * MAX_CODA + 1]))
+)))
 
 # Phonotactic Rule #12: If the second consonant in a complex coda is
 # voiced, the first consonant in the coda must also be voiced.
+solver.add(ForAll([s_idx], Implies(
+    And(s_idx >= 0, s_idx < num_syllables,
+        coda_length[s_idx] >= 2,
+        is_voiced(coda_letters[s_idx * MAX_CODA + 1])),
+    is_voiced(coda_letters[s_idx * MAX_CODA + 0])
+)))
 
 # Phonotactic Rule #13: When a non-alveolar nasal is in a coda
 # together with a non-alveolar obstruent, they must have the same
 # place of articulation, and the obstruent must be a voiceless stop.
+solver.add(ForAll([s_idx, c_idx], Implies(
+    And(s_idx >= 0, s_idx < num_syllables,
+        c_idx >= 0, c_idx < coda_length[s_idx] - 1,
+        is_nasal(coda_letters[s_idx * MAX_CODA + c_idx]),
+        Not(is_alveolar(coda_letters[s_idx * MAX_CODA + c_idx])),
+        is_obstruent(coda_letters[s_idx * MAX_CODA + c_idx + 1]),
+        Not(is_alveolar(coda_letters[s_idx * MAX_CODA + c_idx + 1]))),
+    And(
+        # Same place of articulation
+        is_bilabial(coda_letters[s_idx * MAX_CODA + c_idx]) ==
+        is_bilabial(coda_letters[s_idx * MAX_CODA + c_idx + 1]),
+        is_velar(coda_letters[s_idx * MAX_CODA + c_idx]) ==
+        is_velar(coda_letters[s_idx * MAX_CODA + c_idx + 1]),
+        # Obstruent must be a voiceless stop
+        is_stop(coda_letters[s_idx * MAX_CODA + c_idx + 1]),
+        Not(is_voiced(coda_letters[s_idx * MAX_CODA + c_idx + 1]))
+    )
+)))
 
 # Phonotactic Rule #14: Two obstruents in a coda together must have
 # the same voicing.
+solver.add(ForAll([s_idx, c_idx], Implies(
+    And(s_idx >= 0, s_idx < num_syllables,
+        c_idx >= 0, c_idx < coda_length[s_idx] - 1,
+        is_obstruent(coda_letters[s_idx * MAX_CODA + c_idx]),
+        is_obstruent(coda_letters[s_idx * MAX_CODA + c_idx + 1])),
+    is_voiced(coda_letters[s_idx * MAX_CODA + c_idx]) ==
+    is_voiced(coda_letters[s_idx * MAX_CODA + c_idx + 1])
+)))
 
 # -------------------------------------------------------------------------------------
 
