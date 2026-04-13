@@ -1,9 +1,22 @@
-from z3 import EnumSort, Const, Solver, Implies, Not, sat, And, Function, ForAll, Or, BoolSort, Exists, IntSort, Int, Array, BoolVal
+from z3 import (EnumSort, Const, Solver, Implies, Not, sat, And, Function,
+                ForAll, Or, BoolSort, Exists, IntSort, Int, Array, BoolVal, Sum, If)
+import random
 
-Graphemes, (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, th, ch, sh, ng) = EnumSort('Letters', ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'th', 'ch', 'sh', 'ng'])
+# Constants
+MAX_ONSET     = 3
+MAX_CODA      = 5
+MAX_SYLLABLES = 4
+MIN_WORD_LENGTH = 4
+MAX_WORD_LENGTH = 8
+
+Graphemes, (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, th, ch, sh, ng) = \
+    EnumSort('Letters', ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r',
+                         's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'th', 'ch', 'sh', 'ng'])
 gr = Const('gr', Graphemes)
 
-# Classifier functions ---
+# -------------------------------------------------------------------------------------
+
+# Classifier functions
 is_vowel     = Function('is_vowel',     Graphemes, BoolSort())
 is_glide     = Function('is_glide',     Graphemes, BoolSort())
 is_liquid    = Function('is_liquid',    Graphemes, BoolSort())
@@ -17,14 +30,14 @@ is_obstruent = Function('is_obstruent', Graphemes, BoolSort())
 is_sonorant  = Function('is_sonorant',  Graphemes, BoolSort())
 is_consonant = Function('is_consonant', Graphemes, BoolSort())
 
-all_letters = [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,th,ch,ng]
+all_graphemes = [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,th,ch,sh,ng]
 
 def is_in_set(fn, members):
     """Assert fn(l) == True iff l is in `members`."""
     member_set = set(members)
-    return [fn(l) == BoolVal(l in member_set) for l in all_letters]
+    return [fn(l) == BoolVal(l in member_set) for l in all_graphemes]
 
-# --- Phonological classes (English approximations) ---
+# Phonological classes
 VOWELS     = [a, e, i, o, u]
 GLIDES     = [w, y]
 LIQUIDS    = [l, r]
@@ -51,18 +64,117 @@ solver.add(ForAll([gr], is_consonant(gr) == Not(is_vowel(gr))))
 
 # -------------------------------------------------------------------------------------
 
-# OUR RULES!
+# onset_letters[syl * MAX_ONSET + i] = i-th consonant of onset of syllable syl
+# coda_letters[syl * MAX_CODA + i]   = i-th consonant of coda of syllable syl
+# nucleus_letter[syl]                = vowel of syllable syl
+onset_letters  = Array('onset_letters',  IntSort(), Graphemes)
+coda_letters   = Array('coda_letters',   IntSort(), Graphemes)
+nucleus_letter = Array('nucleus_letter', IntSort(), Graphemes)
+onset_length   = Array('onset_length',   IntSort(), IntSort())
+coda_length    = Array('coda_length',    IntSort(), IntSort())
+num_syllables  = Int('num_syllables')
+s_idx = Int('s_idx')
+c_idx = Int('c_idx')
 
-word = Array('word', IntSort(), Graphemes)
+# Number of syllables in bounds
+solver.add(num_syllables >= 1)
+solver.add(num_syllables <= MAX_SYLLABLES)
+
+# Each syllable's onset/coda lengths are in bounds
+solver.add(ForAll([s_idx], Implies(
+    And(s_idx >= 0, s_idx < num_syllables),
+    And(onset_length[s_idx] >= 0, onset_length[s_idx] <= MAX_ONSET,
+        coda_length[s_idx]  >= 0, coda_length[s_idx]  <= MAX_CODA)
+)))
+
+# Nucleus must be a vowel
+solver.add(ForAll([s_idx], Implies(
+    And(s_idx >= 0, s_idx < num_syllables),
+    is_vowel(nucleus_letter[s_idx])
+)))
+
+# Onset letters must be consonants
+solver.add(ForAll([s_idx, c_idx], Implies(
+    And(s_idx >= 0, s_idx < num_syllables,
+        c_idx  >= 0, c_idx  < onset_length[s_idx]),
+    is_consonant(onset_letters[s_idx * MAX_ONSET + c_idx])
+)))
+
+# Coda letters must be consonants
+solver.add(ForAll([s_idx, c_idx], Implies(
+    And(s_idx >= 0, s_idx < num_syllables,
+        c_idx  >= 0, c_idx  < coda_length[s_idx]),
+    is_consonant(coda_letters[s_idx * MAX_CODA + c_idx])
+)))
+
+# -------------------------------------------------------------------------------------
+
+# OUR SYLLABLE-LEVEL RULES!
+
+word        = Array('word', IntSort(), Graphemes)
 word_length = Int('word_length')
-# We want to generate interesting words, but not too long or too short.
-solver.add(word_length >= 4)
-solver.add(word_length <= 8)
+
+# Word length = sum of all syllable lengths
+solver.add(word_length == Sum([
+    If(syl < num_syllables, onset_length[syl] + 1 + coda_length[syl], 0)
+    for syl in range(MAX_SYLLABLES)
+]))
+
+# Assert that the flat word array matches the syllable structure
+for syl in range(MAX_SYLLABLES):
+    # Start position of this syllable in the flat word array
+    start = Sum([onset_length[s2] + 1 + coda_length[s2] for s2 in range(syl)])
+
+    for ci in range(MAX_ONSET):
+        solver.add(Implies(
+            And(syl < num_syllables, ci < onset_length[syl]),
+            word[start + ci] == onset_letters[syl * MAX_ONSET + ci]
+        ))
+
+    solver.add(Implies(
+        syl < num_syllables,
+        word[start + onset_length[syl]] == nucleus_letter[syl]
+    ))
+
+    for ci in range(MAX_CODA):
+        solver.add(Implies(
+            And(syl < num_syllables, ci < coda_length[syl]),
+            word[start + onset_length[syl] + 1 + ci] == coda_letters[syl * MAX_CODA + ci]
+        ))
+
+# -------------------------------------------------------------------------------------
+
+# MORE RULES WE ADDED!
+
 # No a's, u's, or i's in a row.
 ind = Int('ind')
 solver.add(ForAll([ind], Implies(
     And(ind >= 0, ind < word_length - 1),
     Not(And(word[ind] == word[ind+1], Or(word[ind] == a, word[ind] == i, word[ind] == u)))
+)))
+
+# Each grapheme appears at most once in a single onset
+for syl in range(MAX_SYLLABLES):
+    for ci in range(MAX_ONSET):
+        for cj in range(ci + 1, MAX_ONSET):
+            solver.add(Implies(
+                And(syl < num_syllables, ci < onset_length[syl], cj < onset_length[syl]),
+                onset_letters[syl * MAX_ONSET + ci] != onset_letters[syl * MAX_ONSET + cj]
+            ))
+
+# Each grapheme appears at most once in a single coda
+for syl in range(MAX_SYLLABLES):
+    for ci in range(MAX_CODA):
+        for cj in range(ci + 1, MAX_CODA):
+            solver.add(Implies(
+                And(syl < num_syllables, ci < coda_length[syl], cj < coda_length[syl]),
+                coda_letters[syl * MAX_CODA + ci] != coda_letters[syl * MAX_CODA + cj]
+            ))
+
+# Each syllable must have at least one coda or onset consonant
+solver.add(ForAll([s_idx], Implies(
+    And(s_idx >= 0, s_idx < num_syllables),
+    Or(onset_length[s_idx] >= 1, coda_length[s_idx] >= 1)
 )))
 
 # -------------------------------------------------------------------------------------
@@ -71,16 +183,29 @@ solver.add(ForAll([ind], Implies(
 
 # Phonotactic Rule #1: All phonological words must contain at least
 # one syllable, and hence must contain at least one vowel.
-vowel_ind = Int('vowel_index')
-solver.add(Exists([vowel_ind], And(vowel_ind >= 0, vowel_ind < word_length, is_vowel(word[vowel_ind]))))
+# --- Guaranteed structurally by num_syllables >= 1 and nucleus must be a vowel. --
 
 # Phonotactic Rule #2: Sequences of repeated consonants are not possible.
+solver.add(ForAll([ind], Implies(
+    And(ind >= 0, ind < word_length - 1),
+    Not(And(word[ind] == word[ind+1], is_consonant(word[ind])))
+)))
 
-# Phonotactic Rule #3: The velar nasal /N/ never occurs in the onset of
+# Phonotactic Rule #3: The velar nasal /N/ (ng) never occurs in the onset of
 # a syllable.
+solver.add(ForAll([s_idx, c_idx], Implies(
+    And(s_idx >= 0, s_idx < num_syllables,
+        c_idx  >= 0, c_idx  < onset_length[s_idx]),
+    onset_letters[s_idx * MAX_ONSET + c_idx] != ng
+)))
 
 # Phonotactic Rule #4: The glottal fricative /h/ never occurs in the
 # coda of a syllable.
+solver.add(ForAll([s_idx, c_idx], Implies(
+    And(s_idx >= 0, s_idx < num_syllables,
+        c_idx  >= 0, c_idx  < coda_length[s_idx]),
+    coda_letters[s_idx * MAX_CODA + c_idx] != h
+)))
 
 # Phonotactic Rule #5: The affricates /tS/ and /dZ/, and the glottal
 # fricative /h/, do not occur in complex onsets.
@@ -121,17 +246,27 @@ solver.add(Exists([vowel_ind], And(vowel_ind >= 0, vowel_ind < word_length, is_v
 all_words = []
 
 while len(all_words) < 5 and solver.check() == sat:
-    m = solver.model()
-    
-    length = m.eval(word_length, model_completion=True).as_long()
-    word_letters = [m.eval(word[i], model_completion=True) for i in range(length)]
-    all_words.append(word_letters)
-    
-    # Block this exact word
-    solver.add(Not(And(
-        word_length == length,
-        And([word[i] == word_letters[i] for i in range(length)])
-    )))
+    # Pick a random target length for this word
+    target_length = random.randint(MIN_WORD_LENGTH, MAX_WORD_LENGTH)
+    solver.push()
+    solver.add(word_length == target_length)
+
+    if solver.check() == sat:
+        m = solver.model()
+
+        length = m.eval(word_length, model_completion=True).as_long()
+        word_letters = [m.eval(word[i], model_completion=True) for i in range(length)]
+        all_words.append(word_letters)
+
+        # Block this exact word (added outside the push/pop scope so it persists)
+        solver.pop()
+        solver.add(Not(And(
+            word_length == length,
+            And([word[i] == word_letters[i] for i in range(length)])
+        )))
+    else:
+        # This length was unsatisfiable, just discard and try again
+        solver.pop()
 
 for word_letters in all_words:
     print(''.join(str(l) for l in word_letters))
