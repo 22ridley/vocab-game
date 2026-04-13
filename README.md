@@ -31,3 +31,11 @@ Install the required packages from `requirements.txt`:
 ```bash
 pip install -r requirements.txt
 ```
+
+### Running Constraints
+
+In your terminal, run
+
+```bash
+pip constraints.py
+```

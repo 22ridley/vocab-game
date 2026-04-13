@@ -9,9 +9,9 @@ MAX_SYLLABLES = 4
 MIN_WORD_LENGTH = 4
 MAX_WORD_LENGTH = 8
 
-Graphemes, (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, th, ch, sh, ng) = \
+Graphemes, (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, th, ch, sh, ph, ng, ck, tch, ee, ea, ai, ou, ui, oa, au) = \
     EnumSort('Letters', ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r',
-                         's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'th', 'ch', 'sh', 'ng'])
+                         's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'th', 'ch', 'sh', 'ph', 'ng', 'ck', 'tch', 'ee', 'ea', 'ai', 'ou', 'ui', 'oa', 'au'])
 gr = Const('gr', Graphemes)
 
 # -------------------------------------------------------------------------------------
@@ -34,7 +34,7 @@ is_alveolar = Function('is_alveolar', Graphemes, BoolSort())
 is_bilabial = Function('is_bilabial', Graphemes, BoolSort())
 is_velar = Function('is_velar', Graphemes, BoolSort())
 
-all_graphemes = [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,th,ch,sh,ng]
+all_graphemes = [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,th,ch,sh,ph,ng,ck,tch,ee,ea,ai,ou,ui,oa,au]
 
 def is_in_set(fn, members):
     """Assert fn(l) == True iff l is in `members`."""
@@ -42,19 +42,19 @@ def is_in_set(fn, members):
     return [fn(l) == BoolVal(l in member_set) for l in all_graphemes]
 
 # Phonological classes
-VOWELS = [a, e, i, o, u]
+VOWELS = [a, e, i, o, u, ee, ea, ai, ou, ui, oa, au]
 GLIDES = [w, y]
 LIQUIDS = [l, r]
 NASALS = [m, n, ng]
-FRICATIVES = [f, v, s, z, h, th, sh]
-AFFRICATES = [ch, j]
-STOPS = [b, d, g, k, p, t]
-VOICED = [a, e, i, o, u, b, d, g, v, z, j, l, r, m, n, ng, w, y, th]
+FRICATIVES = [f, v, s, z, h, th, sh, ph]
+AFFRICATES = [ch, j, tch]
+STOPS = [b, d, g, k, p, t, ck]
+VOICED = [a, e, i, o, u, ee, ea, ai, ou, ui, oa, au, b, d, g, v, z, j, l, r, m, n, ng, w, y, th]
 VOICED_OBSTRUENTS = [b, d, g, v, z, j]
 CODA_SECOND_BANNED = [ng, th, r, sh]
 ALVEOLARS = [t, d, s, z, n, l, r]
 BILABIALS = [p, b, m]
-VELARS = [k, g, ng]
+VELARS = [k, g, ng, ck]
 
 solver = Solver()
 solver.add(is_in_set(is_vowel,     VOWELS))
@@ -127,7 +127,7 @@ solver.add(ForAll([s_idx, c_idx], Implies(
 
 # OUR SYLLABLE-LEVEL RULES!
 
-word        = Array('word', IntSort(), Graphemes)
+word = Array('word', IntSort(), Graphemes)
 word_length = Int('word_length')
 
 # Word length = sum of all syllable lengths
@@ -160,13 +160,74 @@ for syl in range(MAX_SYLLABLES):
 
 # -------------------------------------------------------------------------------------
 
+# OUR SONORITY RULES!
+
+# Sonority scale (higher = more sonorant)
+# stops(1) < fricatives(2) < affricates(2) < nasals(3) < liquids(4) < glides(5) < vowels(6)
+sonority = Function('sonority', Graphemes, IntSort())
+
+solver.add(ForAll([gr], sonority(gr) == If(is_stop(gr), 1,
+                                       If(is_fricative(gr), 2,
+                                       If(is_affricate(gr), 2,
+                                       If(is_nasal(gr), 3,
+                                       If(is_liquid(gr), 4,
+                                       If(is_glide(gr), 5,
+                                       If(is_vowel(gr), 6,
+                                       0)))))))))
+# Rising sonority in onsets
+for syl in range(MAX_SYLLABLES):
+    for ci in range(MAX_ONSET - 1):
+        solver.add(Implies(
+            And(syl < num_syllables, ci + 1 < onset_length[syl]),
+            Or(
+                onset_letters[syl * MAX_ONSET + ci] == s,
+                sonority(onset_letters[syl * MAX_ONSET + ci]) <
+                sonority(onset_letters[syl * MAX_ONSET + ci + 1])
+            )
+        ))
+
+    # Last onset consonant must be less sonorant than the nucleus
+    for ci in range(MAX_ONSET):
+        solver.add(Implies(
+            And(syl < num_syllables, onset_length[syl] == ci + 1),
+            Or(
+                onset_letters[syl * MAX_ONSET + ci] == s,
+                sonority(onset_letters[syl * MAX_ONSET + ci]) <
+                sonority(nucleus_letter[syl])
+            )
+        ))
+
+# Falling sonority in codas
+for syl in range(MAX_SYLLABLES):
+    # First coda consonant must be less sonorant than the nucleus
+    solver.add(Implies(
+        And(syl < num_syllables, coda_length[syl] >= 1),
+        Or(
+            coda_letters[syl * MAX_CODA] == s,
+            sonority(coda_letters[syl * MAX_CODA]) <
+            sonority(nucleus_letter[syl])
+        )
+    ))
+
+    for ci in range(MAX_CODA - 1):
+        solver.add(Implies(
+            And(syl < num_syllables, ci + 1 < coda_length[syl]),
+            Or(
+                coda_letters[syl * MAX_CODA + ci + 1] == s,
+                sonority(coda_letters[syl * MAX_CODA + ci]) >
+                sonority(coda_letters[syl * MAX_CODA + ci + 1])
+            )
+        ))
+
+# -------------------------------------------------------------------------------------
+
 # MORE RULES WE ADDED!
 
-# No a's, u's, or i's in a row.
+# No vowels in a row (except our vowel digraphs).
 ind = Int('ind')
 solver.add(ForAll([ind], Implies(
     And(ind >= 0, ind < word_length - 1),
-    Not(And(word[ind] == word[ind+1], Or(word[ind] == a, word[ind] == i, word[ind] == u)))
+    Not(And(is_vowel(word[ind]), is_vowel(word[ind + 1])))
 )))
 
 # Each grapheme appears at most once in a single onset
@@ -331,7 +392,7 @@ solver.add(ForAll([s_idx, c_idx], Implies(
 
 all_words = []
 
-while len(all_words) < 5 and solver.check() == sat:
+while len(all_words) < 15 and solver.check() == sat:
     # Pick a random target length for this word
     target_length = random.randint(MIN_WORD_LENGTH, MAX_WORD_LENGTH)
     solver.push()
