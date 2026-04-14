@@ -4,14 +4,15 @@ import random
 
 # Constants
 MAX_ONSET     = 3
-MAX_CODA      = 5
-MAX_SYLLABLES = 4
+MAX_CODA      = 4 # Because we have x as one grapheme, so sixths is just 3 graphemes
+MIN_SYLLABLES = 2 # To make things interesting
+MAX_SYLLABLES = 3
 MIN_WORD_LENGTH = 4
 MAX_WORD_LENGTH = 8
 
-Graphemes, (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, th, ch, sh, ph, ng, ck, tch, ee, ea, ai, ou, ui, oa, au) = \
-    EnumSort('Letters', ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r',
-                         's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'th', 'ch', 'sh', 'ph', 'ng', 'ck', 'tch', 'ee', 'ea', 'ai', 'ou', 'ui', 'oa', 'au'])
+Graphemes, (a, b, c, d, e, f, g, h, i, j, l, m, n, o, p, qu, r, s, t, u, v, w, th, ch, sh, ph, ng, ck, tch, ea, ai, ou, oa, au) = \
+    EnumSort('Letters', ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'l', 'm', 'n', 'o', 'p', 'qu', 'r',
+                         's', 't', 'u', 'v', 'w', 'th', 'ch', 'sh', 'ph', 'ng', 'ck', 'tch', 'ea', 'ai', 'ou', 'oa', 'au'])
 gr = Const('gr', Graphemes)
 
 # -------------------------------------------------------------------------------------
@@ -34,7 +35,7 @@ is_alveolar = Function('is_alveolar', Graphemes, BoolSort())
 is_bilabial = Function('is_bilabial', Graphemes, BoolSort())
 is_velar = Function('is_velar', Graphemes, BoolSort())
 
-all_graphemes = [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,th,ch,sh,ph,ng,ck,tch,ee,ea,ai,ou,ui,oa,au]
+all_graphemes = [a,b,c,d,e,f,g,h,i,j,l,m,n,o,p,qu,r,s,t,u,v,w,th,ch,sh,ph,ng,ck,tch,ea,ai,ou,oa,au]
 
 def is_in_set(fn, members):
     """Assert fn(l) == True iff l is in `members`."""
@@ -42,19 +43,19 @@ def is_in_set(fn, members):
     return [fn(l) == BoolVal(l in member_set) for l in all_graphemes]
 
 # Phonological classes
-VOWELS = [a, e, i, o, u, ee, ea, ai, ou, ui, oa, au]
-GLIDES = [w, y]
+VOWELS = [a, e, i, o, u, ea, ai, ou, oa, au]
+GLIDES = [w]
 LIQUIDS = [l, r]
 NASALS = [m, n, ng]
-FRICATIVES = [f, v, s, z, h, th, sh, ph]
+FRICATIVES = [f, v, s, c, h, th, sh, ph]
 AFFRICATES = [ch, j, tch]
-STOPS = [b, d, g, k, p, t, ck]
-VOICED = [a, e, i, o, u, ee, ea, ai, ou, ui, oa, au, b, d, g, v, z, j, l, r, m, n, ng, w, y, th]
-VOICED_OBSTRUENTS = [b, d, g, v, z, j]
+STOPS = [b, d, g, p, t, ck, qu]
+VOICED = [a, e, i, o, u, ea, ai, ou, oa, au, b, d, g, v, j, l, r, m, n, ng, w, th]
+VOICED_OBSTRUENTS = [b, d, g, v, j]
 CODA_SECOND_BANNED = [ng, th, r, sh]
-ALVEOLARS = [t, d, s, z, n, l, r]
+ALVEOLARS = [t, d, s, n, l, r]
 BILABIALS = [p, b, m]
-VELARS = [k, g, ng, ck]
+VELARS = [g, ng, ck]
 
 solver = Solver()
 solver.add(is_in_set(is_vowel,     VOWELS))
@@ -78,11 +79,6 @@ solver.add(ForAll([gr], is_sonorant(gr) == Or(is_vowel(gr), is_glide(gr), is_liq
 # Consonant = anything that isn't a vowel
 solver.add(ForAll([gr], is_consonant(gr) == Not(is_vowel(gr))))
 
-# -------------------------------------------------------------------------------------
-
-# onset_letters[syl * MAX_ONSET + i] = i-th consonant of onset of syllable syl
-# coda_letters[syl * MAX_CODA + i]   = i-th consonant of coda of syllable syl
-# nucleus_letter[syl]                = vowel of syllable syl
 onset_letters  = Array('onset_letters',  IntSort(), Graphemes)
 coda_letters   = Array('coda_letters',   IntSort(), Graphemes)
 nucleus_letter = Array('nucleus_letter', IntSort(), Graphemes)
@@ -92,8 +88,12 @@ num_syllables  = Int('num_syllables')
 s_idx = Int('s_idx')
 c_idx = Int('c_idx')
 
+# -------------------------------------------------------------------------------------
+
+# OUR SYLLABLE-LEVEL RULES!
+
 # Number of syllables in bounds
-solver.add(num_syllables >= 1)
+solver.add(num_syllables >= MIN_SYLLABLES)
 solver.add(num_syllables <= MAX_SYLLABLES)
 
 # Each syllable's onset/coda lengths are in bounds
@@ -122,10 +122,6 @@ solver.add(ForAll([s_idx, c_idx], Implies(
         c_idx  >= 0, c_idx  < coda_length[s_idx]),
     is_consonant(coda_letters[s_idx * MAX_CODA + c_idx])
 )))
-
-# -------------------------------------------------------------------------------------
-
-# OUR SYLLABLE-LEVEL RULES!
 
 word = Array('word', IntSort(), Graphemes)
 word_length = Int('word_length')
@@ -165,7 +161,6 @@ for syl in range(MAX_SYLLABLES):
 # Sonority scale (higher = more sonorant)
 # stops(1) < fricatives(2) < affricates(2) < nasals(3) < liquids(4) < glides(5) < vowels(6)
 sonority = Function('sonority', Graphemes, IntSort())
-
 solver.add(ForAll([gr], sonority(gr) == If(is_stop(gr), 1,
                                        If(is_fricative(gr), 2,
                                        If(is_affricate(gr), 2,
@@ -198,6 +193,7 @@ for syl in range(MAX_SYLLABLES):
         ))
 
 # Falling sonority in codas
+# S must be at the beginning or end of a syllable (first onset or last coda position)
 for syl in range(MAX_SYLLABLES):
     # First coda consonant must be less sonorant than the nucleus
     solver.add(Implies(
@@ -208,7 +204,6 @@ for syl in range(MAX_SYLLABLES):
             sonority(nucleus_letter[syl])
         )
     ))
-
     for ci in range(MAX_CODA - 1):
         solver.add(Implies(
             And(syl < num_syllables, ci + 1 < coda_length[syl]),
@@ -218,19 +213,143 @@ for syl in range(MAX_SYLLABLES):
                 sonority(coda_letters[syl * MAX_CODA + ci + 1])
             )
         ))
+        solver.add(Implies(
+            And(syl < num_syllables, ci < coda_length[syl] - 1),
+            coda_letters[syl * MAX_CODA + ci] != ng
+        )) # These must appear last in complex codas
+    for ci in range(MAX_ONSET):
+        solver.add(Implies(
+            And(syl < num_syllables, ci < onset_length[syl],
+                onset_letters[syl * MAX_ONSET + ci] == s),
+            ci == 0  # s must be first in onset
+        ))
+        solver.add(Implies(
+            And(syl < num_syllables, ci < onset_length[syl],
+                onset_length[syl] > 1),
+            And(
+                onset_letters[syl * MAX_ONSET + ci] != v,
+                onset_letters[syl * MAX_ONSET + ci] != w,
+                onset_letters[syl * MAX_ONSET + ci] != qu,
+                onset_letters[syl * MAX_ONSET + ci] != ck,
+                onset_letters[syl * MAX_ONSET + ci] != j,
+                onset_letters[syl * MAX_ONSET + ci] != tch
+            ) # These cannot appear in complex onsets
+        ))
+        solver.add(Implies(
+            And(syl < num_syllables, ci < onset_length[syl]),
+            And(
+                onset_letters[syl * MAX_ONSET + ci] != ck,
+                onset_letters[syl * MAX_ONSET + ci] != tch,
+            )
+        )) # These cannot appear in onsets at all
+    for ci in range(MAX_CODA):
+        solver.add(Implies(
+            And(syl < num_syllables, ci < coda_length[syl],
+                coda_letters[syl * MAX_CODA + ci] == s),
+            ci == coda_length[syl] - 1  # s must be last in coda
+        ))
+        solver.add(Implies(
+            And(syl < num_syllables, ci < coda_length[syl],
+                coda_length[syl] > 1),
+            And(
+                Not(is_fricative(coda_letters[syl * MAX_CODA + ci])),
+                Not(is_affricate(coda_letters[syl * MAX_CODA + ci])),
+                coda_letters[syl * MAX_CODA + ci] != qu,
+                coda_letters[syl * MAX_CODA + ci] != ck,
+                coda_letters[syl * MAX_CODA + ci] != tch,
+            ) # These cannot appear in complex codas
+        ))
+        solver.add(Implies(
+            And(syl < num_syllables, ci < coda_length[syl]),
+            And(
+                coda_letters[syl * MAX_CODA + ci] != j,
+                coda_letters[syl * MAX_CODA + ci] != f,
+                coda_letters[syl * MAX_CODA + ci] != b,
+                coda_letters[syl * MAX_CODA + ci] != c,
+                coda_letters[syl * MAX_CODA + ci] != qu,
+                coda_letters[syl * MAX_CODA + ci] != v,
+            )
+        )) # These cannot appear in codas at all
+    for ci in range(1, MAX_ONSET):
+        solver.add(Implies(
+            And(syl < num_syllables, ci < onset_length[syl]),
+            And(
+                onset_letters[syl * MAX_ONSET + ci] != th,
+                onset_letters[syl * MAX_ONSET + ci] != sh,
+                onset_letters[syl * MAX_ONSET + ci] != ch,
+                onset_letters[syl * MAX_ONSET + ci] != ph,
+            )
+        )) # These must appear first in complex onsets
 
 # -------------------------------------------------------------------------------------
 
 # MORE RULES WE ADDED!
 
+solver.add(is_consonant(word[0]))
+solver.add(Or(is_consonant(word[word_length -1]), word[word_length -1] == e))
+
 # No vowels in a row (except our vowel digraphs).
+# Banning specific sequences of consonants
 ind = Int('ind')
 solver.add(ForAll([ind], Implies(
     And(ind >= 0, ind < word_length - 1),
-    Not(And(is_vowel(word[ind]), is_vowel(word[ind + 1])))
+    And(
+        Not(And(is_vowel(word[ind]), is_vowel(word[ind + 1]))),
+        Not(And(word[ind] == c, word[ind + 1] == m)),
+        Not(And(word[ind] == c, word[ind + 1] == n)),
+        Not(And(word[ind] == ch, word[ind + 1] == s)),
+        Not(And(word[ind] == d, word[ind + 1] == l)),
+        Not(And(word[ind] == d, word[ind + 1] == c)),
+        Not(And(word[ind] == g, word[ind + 1] == t)),
+        Not(And(word[ind] == l, word[ind + 1] == g)),
+        Not(And(word[ind] == l, word[ind + 1] == b)),
+        Not(And(word[ind] == m, word[ind + 1] == b)),
+        Not(And(word[ind] == m, word[ind + 1] == t)),
+        Not(And(word[ind] == m, word[ind + 1] == d)),
+        Not(And(word[ind] == m, word[ind + 1] == l)),
+        Not(And(word[ind] == m, word[ind + 1] == r)),
+        Not(And(word[ind] == m, word[ind + 1] == f)),
+        Not(And(word[ind] == m, word[ind + 1] == h)),
+        Not(And(word[ind] == n, word[ind + 1] == b)),
+        Not(And(word[ind] == n, word[ind + 1] == l)),
+        Not(And(word[ind] == p, word[ind + 1] == c)),
+        Not(And(word[ind] == p, word[ind + 1] == f)),
+        Not(And(word[ind] == p, word[ind + 1] == m)),
+        Not(And(word[ind] == p, word[ind + 1] == n)),
+        Not(And(word[ind] == ph, word[ind + 1] == g)),
+        Not(And(word[ind] == r, word[ind + 1] == ng)),
+        Not(And(word[ind] == s, word[ind + 1] == f)),
+        Not(And(word[ind] == t, word[ind + 1] == f)),
+        Not(And(word[ind] == t, word[ind + 1] == l)),
+        Not(And(word[ind] == t, word[ind + 1] == n)),
+        Not(And(word[ind] == t, word[ind + 1] == m)),
+        Not(And(word[ind] == t, word[ind + 1] == g)),
+        Not(And(word[ind] == t, word[ind + 1] == c)),
+        Not(And(word[ind] == t, word[ind + 1] == d)),
+        Not(And(word[ind] == v, word[ind + 1] == s)),
+    )
+)))
+solver.add(ForAll([ind], Implies(
+    And(ind >= 0, ind < word_length - 2),
+    And(
+        Not(And(word[ind] == l, word[ind + 1] == n, word[ind + 2] == b)),
+        Not(And(word[ind] == l, word[ind + 1] == n, word[ind + 2] == t)),
+        Not(And(word[ind] == l, word[ind + 1] == n, word[ind + 2] == p)),
+        Not(And(word[ind] == l, word[ind + 1] == m, word[ind + 2] == p)),
+        Not(And(word[ind] == l, word[ind + 1] == n, word[ind + 2] == g)),
+        Not(And(word[ind] == l, word[ind + 1] == n, word[ind + 2] == d)),
+        Not(And(word[ind] == r, word[ind + 1] == m, word[ind + 2] == p)),
+        Not(And(word[ind] == r, word[ind + 1] == n, word[ind + 2] == p)),
+        Not(And(word[ind] == r, word[ind + 1] == n, word[ind + 2] == d)),
+        Not(And(word[ind] == r, word[ind + 1] == n, word[ind + 2] == t)),
+        Not(And(word[ind] == r, word[ind + 1] == n, word[ind + 2] == g)),
+        Not(And(word[ind] == s, word[ind + 1] == c, word[ind + 2] == l)),
+        Not(And(word[ind] == s, word[ind + 1] == n, word[ind + 2] == r))
+    )
 )))
 
 # Each grapheme appears at most once in a single onset
+# Each grapheme appears at most once in a single coda
 for syl in range(MAX_SYLLABLES):
     for ci in range(MAX_ONSET):
         for cj in range(ci + 1, MAX_ONSET):
@@ -238,9 +357,6 @@ for syl in range(MAX_SYLLABLES):
                 And(syl < num_syllables, ci < onset_length[syl], cj < onset_length[syl]),
                 onset_letters[syl * MAX_ONSET + ci] != onset_letters[syl * MAX_ONSET + cj]
             ))
-
-# Each grapheme appears at most once in a single coda
-for syl in range(MAX_SYLLABLES):
     for ci in range(MAX_CODA):
         for cj in range(ci + 1, MAX_CODA):
             solver.add(Implies(
@@ -253,6 +369,14 @@ solver.add(ForAll([s_idx], Implies(
     And(s_idx >= 0, s_idx < num_syllables),
     Or(onset_length[s_idx] >= 1, coda_length[s_idx] >= 1)
 )))
+
+# w appears at most once per word
+solver.add(Sum([
+    If(And(syl < num_syllables, ci < onset_length[syl],
+           onset_letters[syl * MAX_ONSET + ci] == w), 1, 0)
+    for syl in range(MAX_SYLLABLES)
+    for ci in range(MAX_ONSET)
+]) <= 1)
 
 # -------------------------------------------------------------------------------------
 
@@ -391,29 +515,73 @@ solver.add(ForAll([s_idx, c_idx], Implies(
 # GENERATE WORDS!
 
 all_words = []
+used_syllables = []  # track syllables across all words
 
-while len(all_words) < 15 and solver.check() == sat:
-    # Pick a random target length for this word
-    target_length = random.randint(MIN_WORD_LENGTH, MAX_WORD_LENGTH)
-    solver.push()
-    solver.add(word_length == target_length)
+while len(all_words) < 50 and solver.check() == sat:
+    m = solver.model()
 
-    if solver.check() == sat:
-        m = solver.model()
+    length = m.eval(word_length, model_completion=True).as_long()
+    num_syl = m.eval(num_syllables, model_completion=True).as_long()
 
-        length = m.eval(word_length, model_completion=True).as_long()
-        word_letters = [m.eval(word[i], model_completion=True) for i in range(length)]
-        all_words.append(word_letters)
+    syllables = []
+    for syl in range(num_syl):
+        o_len = m.eval(onset_length[syl], model_completion=True).as_long()
+        c_len = m.eval(coda_length[syl], model_completion=True).as_long()
+        nucleus = str(m.eval(nucleus_letter[syl], model_completion=True))
 
-        # Block this exact word (added outside the push/pop scope so it persists)
-        solver.pop()
-        solver.add(Not(And(
-            word_length == length,
-            And([word[i] == word_letters[i] for i in range(length)])
-        )))
-    else:
-        # This length was unsatisfiable, just discard and try again
-        solver.pop()
+        onset = ''.join(str(m.eval(onset_letters[syl * MAX_ONSET + ci], model_completion=True))
+                        for ci in range(o_len))
+        coda  = ''.join(str(m.eval(coda_letters[syl * MAX_CODA + ci], model_completion=True))
+                        for ci in range(c_len))
+        syllables.append(onset + nucleus + coda)
 
-for word_letters in all_words:
-    print(''.join(str(l) for l in word_letters))
+        # Block this syllable from appearing in any future word
+        used_syllables.append((
+            m.eval(onset_length[syl],   model_completion=True),
+            m.eval(coda_length[syl],    model_completion=True),
+            m.eval(nucleus_letter[syl], model_completion=True),
+            [m.eval(onset_letters[syl * MAX_ONSET + ci], model_completion=True) for ci in range(o_len)],
+            [m.eval(coda_letters[syl  * MAX_CODA  + ci], model_completion=True) for ci in range(c_len)],
+        ))
+
+    all_words.append(syllables)
+
+    # Block every used syllable from appearing at any position in future words
+    for (o_len, c_len, nuc, on_letters, co_letters) in used_syllables:
+        for syl in range(MAX_SYLLABLES):
+            solver.add(Not(And(
+                onset_length[syl]   == o_len,
+                coda_length[syl]    == c_len,
+                nucleus_letter[syl] == nuc,
+                And([onset_letters[syl * MAX_ONSET + ci] == on_letters[ci]
+                     for ci in range(o_len.as_long())]),
+                And([coda_letters[syl * MAX_CODA + ci] == co_letters[ci]
+                     for ci in range(c_len.as_long())])
+            )))
+
+    # Block this exact word
+    word_letters = [m.eval(word[i], model_completion=True) for i in range(length)]
+    solver.add(Not(And(
+        word_length == length,
+        And([word[i] == word_letters[i] for i in range(length)])
+    )))
+
+    # Block this syllable count and shape to force structural variety
+    solver.add(Not(And(
+        num_syllables == num_syl,
+        And([And(onset_length[syl] == m.eval(onset_length[syl], model_completion=True),
+                 coda_length[syl]  == m.eval(coda_length[syl],  model_completion=True))
+             for syl in range(num_syl)])
+    )))
+
+    # Force a different nucleus in each syllable next time
+    solver.add(Or([
+        nucleus_letter[syl] != m.eval(nucleus_letter[syl], model_completion=True)
+        for syl in range(num_syl)
+    ]))
+
+with open('generated_words.txt', 'w') as f:
+    for syllables in all_words:
+        word_str = ''.join(syllables)
+        print(word_str)
+        f.write(word_str + '\n')
