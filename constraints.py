@@ -580,7 +580,7 @@ while len(all_words) < 50 and solver.check() == sat:
         for syl in range(num_syl)
     ]))
 
-with open('generated_words.txt', 'w') as f:
+with open('generated_words.txt', 'a') as f:
     for syllables in all_words:
         word_str = ''.join(syllables)
         print(word_str)
