@@ -34,8 +34,8 @@ pip install -r requirements.txt
 
 ### Running Constraints
 
-In your terminal, run
+In your terminal, with the virtual environment activated, run
 
 ```bash
-pip constraints.py
+python constraints.py
 ```
