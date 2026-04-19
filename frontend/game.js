@@ -90,7 +90,6 @@ function renderFeedback(type, w) {
 
   if (type === 'correct-real') {
     card.innerHTML = `
-      <div class="entry-label">Entry Field</div>
       <div class="status-indicator">
         <span class="status-dot green"></span>
         <span class="status-text green">Correct</span>
@@ -100,14 +99,12 @@ function renderFeedback(type, w) {
     `;
   } else if (type === 'wrong-fake') {
     card.innerHTML = `
-      <div class="entry-label">Entry Field</div>
       <div class="invalid-label">Invalid Term</div>
       <div class="word-display word-invalid">${w.word}</div>
       <button class="btn btn-primary" onclick="nextWord()">Next Word →</button>
     `;
   } else if (type === 'correct-fake') {
     card.innerHTML = `
-      <div class="entry-label">Entry Field</div>
       <div class="status-indicator">
         <span class="status-dot green"></span>
         <span class="status-text green">Correctly identified</span>
@@ -117,7 +114,6 @@ function renderFeedback(type, w) {
     `;
   } else if (type === 'wrong-real') {
     card.innerHTML = `
-      <div class="entry-label">Entry Field</div>
       <div class="status-indicator">
         <span class="status-dot orange"></span>
         <span class="status-text orange">That was a real word</span>
