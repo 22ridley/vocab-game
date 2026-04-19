@@ -18,4 +18,21 @@ function setActiveNav(page) {
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────────
 navigate('practice');
-startSession();
+
+async function loadWords() {
+  const [realRes, fakeRes] = await Promise.all([
+    fetch('./real_words.txt'),
+    fetch('./generated_words.txt'),
+  ]);
+  const [realText, fakeText] = await Promise.all([realRes.text(), fakeRes.text()]);
+
+  const realWords = realText.split('\n').map(w => w.trim()).filter(Boolean)
+    .map(w => ({ word: w, isReal: true }));
+  const fakeWords = fakeText.split('\n').map(w => w.trim()).filter(Boolean)
+    .map(w => ({ word: w, isReal: false }));
+
+  WORD_POOL = [...realWords, ...fakeWords];
+  startSession();
+}
+
+loadWords();

@@ -33,13 +33,13 @@ function answer(choice) {
   const w = sessionWords[currentIndex];
   let pointsEarned = 0;
 
-  if (choice === 'english' && w.isReal) {
+  if (choice === 'recognize' && w.isReal) {
     pointsEarned = CORRECT_WORD;
     renderFeedback('correct-real', w);
-  } else if (choice === 'english' && !w.isReal) {
+  } else if (choice === 'recognize' && !w.isReal) {
     pointsEarned = PENALTY;
     renderFeedback('wrong-fake', w);
-  } else if (choice === 'madeup' && !w.isReal) {
+  } else if (choice === 'dontrecognize' && !w.isReal) {
     pointsEarned = FAKE_WORD;
     renderFeedback('correct-fake', w);
   } else {
@@ -77,11 +77,10 @@ function renderWord() {
   updateProgress();
   const w = sessionWords[currentIndex];
   document.getElementById('practice-card').innerHTML = `
-    <div class="entry-label">Entry Field</div>
     <div class="word-display">${w.word}</div>
     <div class="btn-group">
-      <button class="btn btn-secondary" onclick="answer('english')">English</button>
-      <button class="btn btn-primary" onclick="answer('madeup')">Made-up</button>
+      <button class="btn btn-secondary" onclick="answer('recognize')">Recognize</button>
+      <button class="btn btn-primary" onclick="answer('dontrecognize')">Don't Recognize</button>
     </div>
   `;
 }
@@ -97,7 +96,6 @@ function renderFeedback(type, w) {
         <span class="status-text green">Correct</span>
       </div>
       <div class="word-display">${w.word}</div>
-      <div class="definition">${w.definition}</div>
       <button class="btn btn-primary" onclick="nextWord()">Next Word →</button>
     `;
   } else if (type === 'wrong-fake') {
@@ -105,7 +103,6 @@ function renderFeedback(type, w) {
       <div class="entry-label">Entry Field</div>
       <div class="invalid-label">Invalid Term</div>
       <div class="word-display word-invalid">${w.word}</div>
-      <div class="definition definition-invalid">This is a made-up word.</div>
       <button class="btn btn-primary" onclick="nextWord()">Next Word →</button>
     `;
   } else if (type === 'correct-fake') {
@@ -116,7 +113,6 @@ function renderFeedback(type, w) {
         <span class="status-text green">Correctly identified</span>
       </div>
       <div class="word-display">${w.word}</div>
-      <div class="definition">That was a made-up word — good catch!</div>
       <button class="btn btn-primary" onclick="nextWord()">Next Word →</button>
     `;
   } else if (type === 'wrong-real') {
@@ -127,7 +123,6 @@ function renderFeedback(type, w) {
         <span class="status-text orange">That was a real word</span>
       </div>
       <div class="word-display">${w.word}</div>
-      <div class="definition">${w.definition}</div>
       <button class="btn btn-primary" onclick="nextWord()">Next Word →</button>
     `;
   }
@@ -137,7 +132,7 @@ function showResults() {
   updateProgress();
   const correct   = results.filter(r => r.pointsEarned > 0).length;
   const penalties = results.filter(r => r.pointsEarned < 0).length;
-  const missed    = results.filter(r => r.pointsEarned === 0 && r.isReal && r.playerAnswer === 'madeup').length;
+  const missed    = results.filter(r => r.pointsEarned === 0 && r.isReal && r.playerAnswer === 'dontrecognize').length;
 
   document.getElementById('results-card').innerHTML = `
     <div class="results-title">Session Complete</div>
