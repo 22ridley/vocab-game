@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VocabScope</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- Navbar -->
+    <nav class="navbar">
+      <span class="navbar-brand">VocabScope</span>
+      <div class="navbar-nav">
+        <button id="nav-gallery"    onclick="navigate('gallery')">Gallery</button>
+        <button id="nav-practice"   onclick="navigate('practice')">Practice</button>
+        <button id="nav-statistics" onclick="navigate('statistics')">Statistics</button>
+        <button id="nav-about"      onclick="navigate('about')">About</button>
+      </div>
+      <div class="navbar-right">
+        <span>Score: <span class="score-badge" id="score-display">0</span></span>
+        <span class="gear-icon">⚙</span>
+      </div>
+    </nav>
+
+    <div class="main">
+
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <button class="sidebar-item" id="sidebar-gallery"    onclick="navigate('gallery')">
+          <span class="sidebar-icon">🖼</span> Gallery
+        </button>
+        <button class="sidebar-item" id="sidebar-practice"   onclick="navigate('practice')">
+          <span class="sidebar-icon">✏️</span> Practice
+        </button>
+        <button class="sidebar-item" id="sidebar-statistics" onclick="navigate('statistics')">
+          <span class="sidebar-icon">📊</span> Statistics
+        </button>
+        <button class="sidebar-item" id="sidebar-about"      onclick="navigate('about')">
+          <span class="sidebar-icon">ℹ️</span> About
+        </button>
+      </aside>
+
+      <!-- Content -->
+      <main class="content">
+
+        <!-- Practice -->
+        <div id="page-practice" class="page">
+          <div class="progress-bar-container">
+            <div class="progress-bar-track">
+              <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+            </div>
+            <div class="progress-text" id="progress-text">0 / 10</div>
+          </div>
+          <div class="practice-card" id="practice-card"></div>
+        </div>
+
+        <!-- Results -->
+        <div id="page-results" class="page">
+          <div class="results-card" id="results-card"></div>
+        </div>
+
+        <!-- Gallery stub -->
+        <div id="page-gallery" class="page">
+          <div class="stub-page">
+            <h2>Gallery</h2>
+            <p>Coming soon.</p>
+          </div>
+        </div>
+
+        <!-- Statistics stub -->
+        <div id="page-statistics" class="page">
+          <div class="stub-page">
+            <h2>Statistics</h2>
+            <p>Coming soon.</p>
+          </div>
+        </div>
+
+        <!-- About stub -->
+        <div id="page-about" class="page">
+          <div class="stub-page">
+            <h2>About</h2>
+            <p>Coming soon.</p>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="words.js"></script>
+  <script src="game.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
