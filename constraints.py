@@ -6,7 +6,7 @@ import random
 MAX_ONSET     = 3
 MAX_CODA      = 4 # Because we have x as one grapheme, so sixths is just 3 graphemes
 MIN_SYLLABLES = 2 # To make things interesting
-MAX_SYLLABLES = 3
+MAX_SYLLABLES = 2
 MIN_WORD_LENGTH = 4
 MAX_WORD_LENGTH = 8
 
@@ -517,7 +517,7 @@ solver.add(ForAll([s_idx, c_idx], Implies(
 all_words = []
 used_syllables = []  # track syllables across all words
 
-while len(all_words) < 50 and solver.check() == sat:
+while len(all_words) < 150 and solver.check() == sat:
     m = solver.model()
 
     length = m.eval(word_length, model_completion=True).as_long()
@@ -580,7 +580,7 @@ while len(all_words) < 50 and solver.check() == sat:
         for syl in range(num_syl)
     ]))
 
-with open('generated_words.txt', 'a') as f:
+with open('generated_words.txt', 'w') as f:
     for syllables in all_words:
         word_str = ''.join(syllables)
         print(word_str)
